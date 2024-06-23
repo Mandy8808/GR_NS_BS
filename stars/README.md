@@ -1,0 +1,1 @@
+This package contains two folders. The first, [EDOs](/EDOs), contains the EDOs system associated with a static and spherically symmetric neutron and boson stars. The second, [Utilez](\Utilez), contains the different tools used in the lectures, including the RK4,5 method and the frequency shooting routines

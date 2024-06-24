@@ -18,7 +18,7 @@ The published materials include a main presentation, as well as some Mathematica
 
 - [Jupyter Nothebook](/Jupyter_Notebook/)
 
-In addition, we include a package [stars](/stars/) with the system, tools, and other resources used in the lectures.
+In addition, we include a folder with some equations of state ([EoSs](/EoS)) and a package [stars](/stars/) with the TOV and EKG systems of equations. Other tools, and resources used in the lectures are also include.
 
 ## Contact
 You can contact me via email: arestrada(at)fisica.uaz.edu.mx/arestrada(at)fisica.ugto..mx

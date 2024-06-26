@@ -1,26 +1,27 @@
 # Estrellas/EDOs
 
-def systemNS(r, yV, feps):
+def systemNS(r, yV, arg):
     """ 
     [g, g', N, N', p, p', \[Rho]] -> [g0, g1, n0, n1, p0, p1, rho]
     """
     g0, n0, p0 = yV
 
-    eps = feps(p0)
+    feps, = arg
+    # eps = feps(p0)  # warning
     if r==0:
-        f0, f1, f2 = 0, 0, 0
-    if p0<0:
+        f0, f1, f2 = 0., 0., 0.
+    elif p0<0:
         # Sch. solution
         f0 = (g0-g0**3)/(2.*r)
         f1 = (n0*(g0**2-1))/(2.*r)
         f2 = 0
     else:
+        eps = feps(p0)  # remove the warning
         f0 = (g0 + g0**3*(-1 + eps*r**2))/(2.*r)
         f1 = (n0*(-1 + g0**2*(1 + p0*r**2)))/(2.*r)
         
         n1 = f1
         f2 = -((n1*(eps + p0))/n0)
-    
     return [f0, f1, f2]
 
 

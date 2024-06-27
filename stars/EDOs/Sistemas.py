@@ -22,7 +22,26 @@ def systemNS(r, yV, arg):
         
         n1 = f1
         f2 = -((n1*(eps + p0))/n0)
+
     return [f0, f1, f2]
+
+def systemNewton(r, yV, arg):
+    """ 
+    [m, p]
+    """
+    m0, p0 = yV
+
+    feps, = arg
+    if r==0:
+        f0, f1 = 0., 0.
+    elif p0<0:
+        f0, f1 = 0., 0.
+    else:
+        eps = feps(p0)  # remove the warning
+        f0 = r*eps/2
+        f1 = -m0*eps/r**2
+
+    return [f0, f1]
 
 
 def systemBS(r, yV, arg):

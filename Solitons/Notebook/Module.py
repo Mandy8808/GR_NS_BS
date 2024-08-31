@@ -11,13 +11,37 @@ import glob
 ########
 # Main #
 ########
+#   dt, C, m=0,  c=1, NoHomog, V=None, user_action=None, Vp=lambda u: 0
 
-def solver(I, xmax, tmax, dt, C, t0=0, x0=0, c=1, f=None, V=None, user_action=None,
-           simulacion=True, address='Data', filename='.data', ZipName='SimulacionData',
-           info=False):
+def solver(dt, dx, xmax, tmax, ux, dux=lambda u: 0, dVx=lambda u: 0, xmin=0, tmin=0, NoHomog=[0, 0],
+           simulacion=True, address='Data', filename='.data', ZipName='SimulacionData', info=False,
+           user_action=None):
     """
-    Resolución de la ecuación diferencial: u_tt = c^2*u_xx + f para una malla (0, L) \times (0,T]
-
+    Resolución de la ecuación diferencial con la estructura: 
+        
+        u_tt = u_xx - V'(u) 
+        
+    para una malla (xmin, xmax) \times (tmin, tmax), con dt, dx
+    
+    In:
+        Condiciones a la frontera:
+        NoHomog = [u(t, xmin), u(t, xmax)] : una lista con el valor en la frontera, predeterminado NoHomog = [0, 0] 
+    
+    Funciones complementarias:
+        Condiciones iniciales:
+        ux -> una función que corresponda a u(t=0, x)
+        dux -> una función que corresponda a du(t=0, x)/dt, por defecto, dUx = 0
+    
+        Derivada del potencial
+        dVx -> una función que corresponde a la derivada con respecto al campo del potencial V, por defecto dVx=0
+    
+    Opciones:
+        simulacion -> True para salvar los datos de las iteraciones numéricas, False para no salvarlo
+        address -> Folder que se creará para salvar los datos de las iteraciones numéricas
+        filename -> Prefijo de los archivos que se salvarán con las iteraciones numéricas
+        ZipName -> Nombre del archivo general que salvará TODA la simulación
+        info -> True para ver ciertas informaciones, False para no verlas
+    
     Variables:
     xi -> Arreglo correspondiente a la discretización del espacio
     ti -> Arreglo correspondiente a la discretización del tiempo
@@ -34,17 +58,17 @@ def solver(I, xmax, tmax, dt, C, t0=0, x0=0, c=1, f=None, V=None, user_action=No
         data = StoreSolution(address, filename, info=info)
     else:
         data = None
-
+        
     #### Checks
-    f, V = funciones(f, V)
-    check(dt, tmax, f, V, I)
+    funciones = [ux, dux, dVx]
+    check(tmin, tmax, dt, xmin, xmax, dx, funciones)
     
     #### Malla
-    ti, xi = malla(t0, tmax, dt, x0, xmax, c, C)
+    ti, xi = malla(tmin, tmax, dt, xmin, xmax, dx)
 
     start = time.time()
     # Cargando dato inicial dentro de u_n
-    u_n = I(xi)
+    u_n = ux(xi)
     
     ########################################
     utilez = [u_n, ti, xi, -1, data]  # u, ti, xi, n, data
@@ -52,9 +76,8 @@ def solver(I, xmax, tmax, dt, C, t0=0, x0=0, c=1, f=None, V=None, user_action=No
     ########################################
 
     # Primer paso de iteración temporal
-    utilez = [dt, f, V, C]
-    u = zerostep(xi, ti, u_n, utilez)
-
+    u = zerostep(xi, dx, dt, ux=u_n, dux=dux, dVx=dVx, NoHomog=NoHomog)
+    
     ########################################
     utilez = [u, ti, xi, 0, data]  # u, ti, xi, n, data
     Operaciones(user_action, simulacion, utilez)
@@ -66,8 +89,7 @@ def solver(I, xmax, tmax, dt, C, t0=0, x0=0, c=1, f=None, V=None, user_action=No
 
     Nt = ti.size - 1
     for n in range(1, Nt):
-        utilez = [dt, f, C]
-        u = nsteps(n, xi, ti, u_n, u_nm1, utilez)
+        u = nsteps(dx, dt, ux=u_n, uxm1=u_nm1, dVx=dVx, NoHomog=NoHomog)
 
         ########################################
         utilez = [u, ti, xi, n, data]  # u, ti, xi, n, data
@@ -89,160 +111,92 @@ def solver(I, xmax, tmax, dt, C, t0=0, x0=0, c=1, f=None, V=None, user_action=No
 
     return u, xi, ti, cpu_time
 
-
-def solverO(I, xmax, tmax, dt, C, t0=0, x0=0, c=1, f=None, V=None, user_action=None, info=False):
-    """
-    Resolución de la ecuación diferencial: u_tt = c^2*u_xx + f para una malla (0, L) \times (0,T]
-
-    Variables:
-    xi -> Arreglo correspondiente a la discretización del espacio
-    ti -> Arreglo correspondiente a la discretización del tiempo
-    u -> Arreglo (de puntos espaciales) correspondiente a la solución en la próxima iteración en el tiempo u^{n+1}_{i}
-    u_n -> Arreglo correspondiente a la solución en el nivel anterior en el tiempo u^{n}_{i}
-    u_nm1 -> Arreglo correspondiente a la solución en dos niveles anteriores en el tiempo u^{n-1}_{i}
-
-    In:
-
-    Out:
-    
-    """
-
-    f, V = funciones(f, V)
-
-    #### Checks
-    check(dt, tmax, f, V, I)
-    
-    #### Malla
-    ti, xi = malla(t0, tmax, dt, x0, xmax, c, C)
-
-    start = time.time()
-    # Cargando dato inicial dentro de u_n
-    u_n = I(xi) 
-
-    # Primer paso de iteración temporal
-    utilez = [dt, f, V, C]
-    u = zerostep(xi, ti, u_n, utilez)
-
-    if user_action:
-        user_action(u, xi, ti, n=0)
-
-    # Intercambiando variables para el próximo paso de iteración
-    u_nm1 = np.copy(u_n)
-    u_n = np.copy(u)
-
-    Nt = ti.size - 1
-    for n in range(1, Nt):
-        utilez = [dt, f, C]
-        u = nsteps(n, xi, ti, u_n, u_nm1, utilez)
-
-        if user_action:
-            if user_action(u, xi, ti, n):
-                break
-        
-        # Intercambiando variables para el próximo paso de iteración
-        u_nm1 = np.copy(u_n)
-        u_n = np.copy(u)
-
-    end = time.time()
-    cpu_time = end - start
-    if info:
-        print('cpu time:', cpu_time)
-
-    return u, xi, ti, cpu_time
-
 ###############
 # Iteraciones #
 ###############
-def zerostep(xi, ti, u_n, utilez):
+def zerostep(xi, dx, dt, ux, dux=lambda u: 0, dVx=lambda u: 0, NoHomog=[0, 0]):
     """
     Primera iteración temporal
     
     In:
-    xi -> Arreglo correspondiente a la discretización del espacio
-    ti -> Arreglo correspondiente a la discretización del tiempo
-    u -> Arreglo (de puntos) de la solución en la próxima iteración en el tiempo
-    u_n -> Arreglo de la solución en el nivel anterior en el tiempo  Solution at 1 time level back
+    xi -> Arreglo correspondiente a la discretización del espacio con dx
+    dt -> ancho de la malla temporal
+    ux -> Arreglo (de puntos) de la solución en la iteración t=0
+    dux -> Función de la derivada de la solución en la iteración t=0
+    dVx -> Función del potencial
 
     Out:
     u
     """
-
-    dt, f, V, C = utilez
-    C2 = C**2
+    C2 = (dt/dx)**2
+    Nx = ux.size
+    duxi = dux(xi[1:-1]) 
     
-    Vi = V(xi[1:-1])
-    n = 0
-    fi = f(xi[1:-1], ti[n])
+    u = np.zeros(Nx)
+    u[1:-1] = ux[1:-1] + dt*duxi + 0.5*C2*(ux[2:] - 2*ux[1:-1] + ux[:-2]) - 0.5*dt**2*dVx(ux[1:-1])
     
-    Nx = u_n.size - 1
-    u = np.zeros(Nx+1)
-    u[1:-1] = u_n[1:-1] + dt*Vi + 0.5*C2*(u_n[2:] - 2*u_n[1:-1] + u_n[:-2]) + 0.5*dt**2*fi  # revisar signo + dt*Vi 
-    
+    u[0] = NoHomog[0]
+    u[-1] = NoHomog[1]
     return u
 
-def nsteps(n, xi, ti, u_n, u_nm1, utilez):
+
+def nsteps(dx, dt, ux, uxm1, dVx=lambda u: 0, NoHomog=[0, 0]):
     """
-    Primera iteración temporal
+    n-iteración temporal
     
     In:
-    xi -> Arreglo correspondiente a la discretización del espacio
-    ti -> Arreglo correspondiente a la discretización del tiempo
-    u -> Arreglo (de puntos espaciales) correspondiente a la solución en la próxima iteración en el tiempo u^{n+1}_{i}
-    u_n -> Arreglo correspondiente a la solución en el nivel anterior en el tiempo u^{n}_{i}
-    u_nm1 -> Arreglo correspondiente a la solución en dos niveles anteriores en el tiempo u^{n-1}_{i}
+    dx -> ancho de la malla espacial
+    dt -> ancho de la malla temporal
+    ux -> Arreglo (de puntos) de la solución en la iteración t=n
+    uxm1 -> Arreglo correspondiente a la solución en dos niveles anteriores en el tiempo u^{n-1}_{i}
+    dVx -> Función del potencial
     
     Out:
     u
     """
-    dt, f, C = utilez
-    C2 = C**2
+    C2 = (dt/dx)**2
+    Nx = ux.size
     
-    fi = f(xi[1:-1], ti[n]*np.ones(len(xi[1:-1])))
-    
-    Nx = u_n.size
     u = np.zeros(Nx)
-    u[1:-1] = -u_nm1[1:-1] + 2*u_n[1:-1] + C2*(u_n[2:] - 2*u_n[1:-1] + u_n[:-2]) + dt**2*fi
+    u[1:-1] = -uxm1[1:-1] + 2*ux[1:-1] + C2*(ux[2:] - 2*ux[1:-1] + ux[:-2]) - dt**2*dVx(ux[1:-1])
+    
+    u[0] = NoHomog[0]
+    u[-1] = NoHomog[1]
     return u
 
 
 #########################
 # Funciones secundarias #
 #########################
-def funciones(f, V):
+def check(tmin, tmax, dt, xmin, xmax, dx, funciones) :
     """ 
-    """
-    if (f is None) or (f==0):
-        f=lambda x, t: 0
-    
-    if (V is None) or (V==0):
-        V=lambda x: 0
-    return f, V
-
-def check(dt, tmax, f, V, I):
-    """ 
-    Función que checa que las entradas f, V sean objetos tipo funciones y el paso temporal dado sea menor a tmax
+    Revisando si el dx, y el dt es el adecuado
+    Revisando si las funciones auxiliares están bien definidas
     """
     # check dt
-    if dt>tmax:
-        sys.exit("El paso temporal dt debe ser mas pequeño que el intervalo temporal tmax")
+    if dt>(tmax-tmin):
+        sys.exit("El paso temporal dt debe ser mas pequeño que el intervalo temporal tmax-tmin")
+    if dx>(xmax-xmin):
+        sys.exit("El paso espacial dx debe ser mas pequeño que el intervalo espacial xmax-xmin")
+    
     # check si es funcion
-    if not callable(f):
-        sys.exit("La fuente f debe ser una función")
-    if not callable(V):
-        sys.exit("El potencial V debe ser una función")
-    if not callable(I):
-        sys.exit("La configuración inicial debe ser una función")
+    text = ['Error: u(t=0, x) debe ser una función',
+            'Error: du(t=0, x)/dt debe ser una función',
+            'Error dV/du debe ser una función'
+            ]
+    for i in range(len(funciones)):
+        if not callable(funciones[i]):
+            sys.exit(text[i])
 
-def malla(t0, tmax, dt, x0, xmax, c, C):
+def malla(tmin, tmax, dt, xmin, xmax, dx):
     """ 
-    Devuelve la malla espacial para un dt y tmax definido, asumiendo una discretizacion espacial de la forma:
-    dx = c dt/C
+    Devuelve la malla espacial para un dt y un intervalo tmin-tmax definido, asumiendo una discretizacion espacial dx entre xmin-xmax
     """
-    Nt = int(round(tmax/dt))
-    ti = t0 + dt*np.arange(Nt+1)
-    dx = dt*c/float(C)  # 
-    Nx = int(round((xmax-x0)/dx))
-    xi = x0 + dx*np.arange(Nx+1)
+    Nt = int(round((tmax-tmin)/dt))
+    ti = tmin + dt*np.arange(Nt+1)
+    
+    Nx = int(round((xmax-xmin)/dx))
+    xi = xmin + dx*np.arange(Nx+1)
     return ti, xi
 
 def Operaciones(user_action, simulacion, utilez):
@@ -336,16 +290,16 @@ class StoreSolution:
             JoinFilesInOneZip(filenames, archive_name)
 
 
-
 class Visualization:
 
-    def __init__(self, address, figData, info=False):
+    def __init__(self, address, figData, solAnalit=None, info=False):
         if info:
             print(f"Usando dirección {address}")
         
         # Atributos de instancia
         self.direccion = address
         self.figData = figData
+        self.solAnalit = solAnalit
 
     # METODOS
     def loadData(self):
@@ -361,7 +315,14 @@ class Visualization:
         fig, ax = self.figData
 
         frame, = ax.plot(xi, u0, ls=ls, c=color, lw=lw)
-        tframe = ax.text(xmax-xmax/4, max(u0)-max(u0)/8, s=r'time=$%3.2f$'%t0, fontsize='small')
+        
+        if self.solAnalit:
+            vt0 = np.ones(len(xi))*t0
+            frame1, = ax.plot(xi, self.solAnalit(vt0, xi), ls=':', color='k', lw=lw)
+        else:
+            frame1 = None
+            
+        tframe = ax.text(xmax-xmax/2, max(u0)-max(u0)/8, s=r'time=$%3.2f$'%t0, fontsize='small')
 
         if solEx:
             xi = frame.get_xdata()
@@ -388,20 +349,26 @@ class Visualization:
             import matplotlib.pyplot as plt
             plt.show()
 
-        return fig, ax, frame, frameSol, tframe
+        return fig, ax, frame, frameSol, tframe, frame1
     
-    def updateframe(self, ind, frame, frameSol, tframe, 
+    def updateframe(self, ind, frame, frameSol, tframe, frame1,
                     ax, ti, dataname, array_names, solEx, ylim):
         """ 
         """
         t = ti[ind]
         #print(t)
-        tframe.set_text(r'time=$%7.6f$'%t)
+        tframe.set_text(r'time=$%4.3f$'%t)
 
         ui = array_names[dataname+'%d'%ind]
 
         # updating axis
         frame.set_ydata(ui)
+        
+        if frame1:
+            xi = frame1.get_xdata()
+            vt = np.ones(len(xi))*t
+            frame1.set_ydata(self.solAnalit(vt, xi))
+        
         if frameSol:
             xi = frameSol.get_xdata()
             uiE = solEx(xi, t)
@@ -413,7 +380,7 @@ class Visualization:
         else:    
             ax.set_ylim(min(ui)-min(ui)/8, max(ui)+max(ui)/8)
 
-        return frame, frameSol, tframe,
+        return frame, frameSol, tframe, frame1
 
     def video(self, n0, dataname, struc, nameV, direc='/', xlim=None, ylim=None,
               vconf=[10, 1000000, ['-vcodec', 'libx264']],
@@ -431,12 +398,12 @@ class Visualization:
         
         data = [u0, xi, ti[n0]]
         
-        fig, ax, frame, frameSol, tframe = self.frame0(data, struc, xlim=xlim, ylim=ylim, solEx=solEx, show=show)
+        fig, ax, frame, frameSol, tframe, frame1 = self.frame0(data, struc, xlim=xlim, ylim=ylim, solEx=solEx, show=show)
         frames = len(ti[n0:])
 
         anim = animation.FuncAnimation(fig, self.updateframe,
                                        frames=range(n0, frames),
-                                       fargs=(frame, frameSol, tframe, ax, ti, dataname, array_names, solEx, ylim),
+                                       fargs=(frame, frameSol, tframe, frame1, ax, ti, dataname, array_names, solEx, ylim),
                                        interval=50, blit=False)
         
         fps, bitrate, extra_args = vconf

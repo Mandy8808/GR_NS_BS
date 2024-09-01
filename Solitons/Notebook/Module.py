@@ -8,13 +8,15 @@ import os
 import zipfile
 import glob
 
+import matplotlib.pyplot as plt
+
 ########
 # Main #
 ########
 #   dt, C, m=0,  c=1, NoHomog, V=None, user_action=None, Vp=lambda u: 0
 
-def solver(dt, dx, xmax, tmax, ux, dux=lambda u: 0, dVx=lambda u: 0, xmin=0, tmin=0, NoHomog=[0, 0],
-           simulacion=True, address='Data', filename='.data', ZipName='SimulacionData', info=False,
+def solver(dt, dx, xmax, tmax, ux, dux=lambda x: 0, Vx=lambda u: 0, dVx=lambda u: 0, xmin=0, tmin=0, NoHomog=[0, 0],
+           simulacion=True, address='Data', filename='.data', ZipName='SimulacionData', info=False, density=False,
            user_action=None):
     """
     Resolución de la ecuación diferencial con la estructura: 
@@ -31,7 +33,10 @@ def solver(dt, dx, xmax, tmax, ux, dux=lambda u: 0, dVx=lambda u: 0, xmin=0, tmi
         Condiciones iniciales:
         ux -> una función que corresponda a u(t=0, x)
         dux -> una función que corresponda a du(t=0, x)/dt, por defecto, dUx = 0
-    
+
+        Potencial
+        Vx => una función que corresponde al potencial (se usa para calcular la densidad de energía)
+        
         Derivada del potencial
         dVx -> una función que corresponde a la derivada con respecto al campo del potencial V, por defecto dVx=0
     
@@ -70,16 +75,26 @@ def solver(dt, dx, xmax, tmax, ux, dux=lambda u: 0, dVx=lambda u: 0, xmin=0, tmi
     # Cargando dato inicial dentro de u_n
     u_n = ux(xi)
     
+    if density:
+        dens = densidad(u=u_n, xi=xi, dux=dux, V=Vx)
+    else:
+        dens = 0
+    
     ########################################
-    utilez = [u_n, ti, xi, -1, data]  # u, ti, xi, n, data
+    utilez = [u_n, ti, xi, -1, dens, data]  # u, ti, xi, n, data
     Operaciones(user_action, simulacion, utilez)
     ########################################
 
     # Primer paso de iteración temporal
     u = zerostep(xi, dx, dt, ux=u_n, dux=dux, dVx=dVx, NoHomog=NoHomog)
     
+    if density:
+        dens = densidad(u=u, xi=xi, um=u_n, dt=dt, V=Vx)
+    else:
+        dens = 0
+        
     ########################################
-    utilez = [u, ti, xi, 0, data]  # u, ti, xi, n, data
+    utilez = [u, ti, xi, 0, dens, data]  # u, ti, xi, n, data
     Operaciones(user_action, simulacion, utilez)
     ########################################
 
@@ -91,8 +106,13 @@ def solver(dt, dx, xmax, tmax, ux, dux=lambda u: 0, dVx=lambda u: 0, xmin=0, tmi
     for n in range(1, Nt):
         u = nsteps(dx, dt, ux=u_n, uxm1=u_nm1, dVx=dVx, NoHomog=NoHomog)
 
+        if density:
+            dens = densidad(u=u, xi=xi, um=u_n, dt=dt, V=Vx)
+        else:
+            dens = 0
+        
         ########################################
-        utilez = [u, ti, xi, n, data]  # u, ti, xi, n, data
+        utilez = [u, ti, xi, n, dens, data]  # u, ti, xi, n, data
         Operaciones(user_action, simulacion, utilez)
         ########################################
 
@@ -114,7 +134,7 @@ def solver(dt, dx, xmax, tmax, ux, dux=lambda u: 0, dVx=lambda u: 0, xmin=0, tmi
 ###############
 # Iteraciones #
 ###############
-def zerostep(xi, dx, dt, ux, dux=lambda u: 0, dVx=lambda u: 0, NoHomog=[0, 0]):
+def zerostep(xi, dx, dt, ux, dux=lambda x: 0, dVx=lambda u: 0, NoHomog=[0, 0]):
     """
     Primera iteración temporal
     
@@ -164,6 +184,18 @@ def nsteps(dx, dt, ux, uxm1, dVx=lambda u: 0, NoHomog=[0, 0]):
     u[-1] = NoHomog[1]
     return u
 
+def densidad(u, xi, dux=None, um=None, dt=None, V=lambda u:0):
+    """
+    rho = ((du/dt)^2 + (du/dx)^2)/2 + V(u)
+    """ 
+    if dux:
+        rho = (dux(xi)**2 + np.gradient(u, xi)**2)/2 + V(u)
+        #plt.plot(xi, rho)
+        #plt.show()
+    else:
+        du = (u-um)/dt
+        rho = (du**2 + np.gradient(u, xi)**2)/2 + V(u)
+    return rho
 
 #########################
 # Funciones secundarias #
@@ -200,12 +232,12 @@ def malla(tmin, tmax, dt, xmin, xmax, dx):
     return ti, xi
 
 def Operaciones(user_action, simulacion, utilez):
-    u, ti, xi, n, data = utilez
+    u, ti, xi, n, dens, data = utilez
     if user_action:
         user_action(u, xi, ti, n)
     
     if simulacion:
-        data.save_file(u, ti, xi, n)
+        data.save_file(u, dens, ti, xi, n)
         
 
 def JoinFilesInOneZip(archives, archive_name):
@@ -256,7 +288,7 @@ class StoreSolution:
         self.time = []
 
     # METODOS
-    def save_file(self, dataU, ti, xi, n):
+    def save_file(self, dataU, dataDens, ti, xi, n):
 
         # verificando si existe o creando la carpeta
         if not os.path.exists(self.direccion):
@@ -265,6 +297,11 @@ class StoreSolution:
         # salvando u
         kwargs = {self.nombre + '%d'%(n+1): dataU} 
         fname = self.direccion + '/' + self.nombre + '_u_%d'%(n+1) + '.dat'
+        np.savez(fname, **kwargs)
+        
+        # salvando densidad
+        kwargs = {self.nombre + '_dens_' + '%d'%(n+1): dataDens} 
+        fname = self.direccion + '/' + self.nombre + '_dens_%d'%(n+1) + '.dat'
         np.savez(fname, **kwargs)
         
         # almacenando el tiempo
@@ -322,7 +359,7 @@ class Visualization:
         else:
             frame1 = None
             
-        tframe = ax.text(xmax-xmax/2, max(u0)-max(u0)/8, s=r'time=$%3.2f$'%t0, fontsize='small')
+        tframe = ax.text(xlim[-1]-xlim[-1]/2, max(u0)-max(u0)/8, s=r'time=$%3.2f$'%t0, fontsize='small')
 
         if solEx:
             xi = frame.get_xdata()

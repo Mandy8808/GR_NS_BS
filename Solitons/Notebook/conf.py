@@ -1,30 +1,53 @@
 ######
-# CONFIGURACION QUE USO PARA GRAFICAR
+# MODULO PARA CONFIGURACION GENERAL DE GRAFICOS
+# For more rcParams check
+# https://matplotlib.org/stable/users/explain/customizing.html#matplotlibrc-sample
 ####
 
-# MODULOS
+
+print('CARGANDO CONFIGURACION GENERAL PARA PLOTS')
+
+# import
 import matplotlib as mpl
 import matplotlib.font_manager as font_manager
 
 from cycler import cycler
 
-
 def general():
     """
-    CONFIGURACION QUE USO PARA GRAFICAR
-    """
-    # CONFIGURACIÓN GENERAL
+    CONFIGURACIÓN GENERAL
+    """ 
+    for i in [FigParam(), LineParam(), axesParam(), labelParam(), fontParam()]:
+        i
 
-    # Figura
-    # mpl.rcParams['figure.dpi'] = 100 # figure dots per inch
-    mpl.rcParams['figure.figsize'] = [4,3] #[12, 9]  # [4,3]
+    return
+
+def FigParam():
+    """
+    configuracion de los marcos, resolucion, etc.
+    see: https://matplotlib.org/stable/api/_as_gen/matplotlib.figure.Figure.savefig.html
+    """
+    # resolution
+    mpl.rcParams['figure.figsize'] = [6.4, 4.8]  # (width, height) in inches
     mpl.rcParams['figure.facecolor'] = 'white'     # figure facecolor
     mpl.rcParams['figure.edgecolor'] = 'white'     # figure edgecolor
-    mpl.rcParams['savefig.dpi'] = 100
+    mpl.rcParams['figure.dpi'] = 100 # resolution in dots per inch.
 
+    # to save
+    mpl.rcParams['savefig.dpi'] = 1000
+    #mpl.rcParams['savefig.metadata'] = None
+    mpl.rcParams['savefig.format'] = 'pdf'
+    mpl.rcParams['savefig.bbox'] = 'tight' # Plot will be occupy a maximum of available space
+    mpl.rcParams['savefig.pad_inches'] = 0.1
+    mpl.rcParams['savefig.facecolor'] = 'auto'
+    mpl.rcParams['savefig.edgecolor'] = 'auto'
+    
+        
+def LineParam():
     # estilo de linea y grosor
     mpl.rcParams['lines.linestyle'] = '-'
-    mpl.rcParams['lines.linewidth'] = 2.
+    mpl.rcParams['lines.linewidth'] = 1.5
+    mpl.rcParams['lines.markersize'] = 10  # weight of the marker
 
     # orden de los colores que usará
     mpl.rcParams['axes.prop_cycle'] = cycler('color',
@@ -32,20 +55,14 @@ def general():
                                               '#d62728', '#9467bd', '#8c564b',
                                               '#e377c2', '#7f7f7f', '#bcbd22',
                                               '#17becf'])
-    # latex modo math
-    # Should be: 'dejavusans' (default), 'dejavuserif', 'cm' (Computer Modern),
-    #             'stix', 'stixsans' or 'custom'
-    mpl.rcParams['mathtext.fontset'] = 'cm'
-    mpl.rcParams['mathtext.fallback'] = 'cm'
 
-    # latex modo text
-    # Should be: serif, sans-serif, cursive, fantasy, monospace
-    mpl.rcParams['font.family'] = 'serif'
-    cmfont = font_manager.FontProperties(fname=mpl.get_data_path()
-                                         + '/fonts/ttf/cmr10.ttf')
-    mpl.rcParams['font.serif'] = cmfont.get_name()
-    mpl.rcParams['font.size'] = 16  # size of the text
-      
+def axesParam():
+    mpl.rcParams['axes.grid'] = False
+    mpl.rcParams['axes.formatter.limits'] = -4, 6  # use scientific notation if log10
+                                                   # of the axis range is smaller than the
+                                                   # first or larger than the second
+
+    mpl.rcParams['axes.formatter.use_mathtext'] = True # When True, use mathtext for scientific notation.
 
     # Display axis spines, (muestra la linea de los marcos)
     mpl.rcParams['axes.spines.left'] = True
@@ -53,28 +70,46 @@ def general():
     mpl.rcParams['axes.spines.top'] = True
     mpl.rcParams['axes.spines.right'] = True
 
+    # draw ticks on the top side
+    mpl.rcParams['xtick.bottom'] = True
+    mpl.rcParams['xtick.top'] = False
+    mpl.rcParams['ytick.left'] = True
+    mpl.rcParams['ytick.right'] = False
+
+    # draw x axis bottom/top major ticks
+    mpl.rcParams['xtick.major.top'] = False
+    mpl.rcParams['xtick.major.bottom'] = True
+    mpl.rcParams['ytick.major.right'] = False
+    mpl.rcParams['ytick.major.left'] = True
+    
+    # draw x axis bottom/top minor ticks
+    mpl.rcParams['xtick.minor.top'] = False
+    mpl.rcParams['xtick.minor.bottom'] = False 
+    mpl.rcParams['ytick.minor.right'] = False
+    mpl.rcParams['ytick.minor.left'] = False 
+
+    # direction: {in, out, inout} señalamiento de los ejes
+    mpl.rcParams['xtick.direction'] = 'out'
+    mpl.rcParams['ytick.direction'] = 'out'
+    
+    mpl.rcParams['xtick.minor.visible'] = True # visibility of minor ticks on x-axis
+
+
+def labelParam():
+    mpl.rcParams['xaxis.labellocation'] = 'center'  # alignment of the xaxis label: {left, right, center}
+    mpl.rcParams['yaxis.labellocation'] = 'center'  # alignment of the yaxis label: {bottom, top, center}
+
     # axes numbers, etc.
     # 'large' tamaño de los números de las x, y
     mpl.rcParams['xtick.labelsize'] = 13
     mpl.rcParams['ytick.labelsize'] = 13
-    # direction: {in, out, inout} señalamiento de los ejes
-    mpl.rcParams['xtick.direction'] = 'out'
-    mpl.rcParams['ytick.direction'] = 'out'
-    # draw ticks on the top side (dibujar las divisiones arriba)
-    mpl.rcParams['xtick.top'] = False
-    mpl.rcParams['ytick.right'] = False
+    
     # draw label on the top/bottom
     mpl.rcParams['xtick.labeltop'] = False
     mpl.rcParams['xtick.labelbottom'] = True
-    # draw x axis bottom/top major ticks
-    mpl.rcParams['xtick.major.top'] = False
-    mpl.rcParams['xtick.major.bottom'] = True
-    # draw x axis bottom/top minor ticks
-    mpl.rcParams['xtick.minor.top'] = False
-    mpl.rcParams['xtick.minor.bottom'] = False
-
-    # mpl.rcParams['xtick.minor.visible'] = True # visibility of minor ticks on x-axis
-
+    mpl.rcParams['ytick.labelright'] = False
+    mpl.rcParams['ytick.labelleft'] = True
+    
     # labels and title
     mpl.rcParams['axes.titlepad'] = 6.0  # pad between axes and title in points
     mpl.rcParams['axes.labelpad'] = 3.0  # 10.0     # space between label and axis
@@ -85,8 +120,9 @@ def general():
 
     mpl.rcParams['axes.titlesize'] = 24  # title size
     mpl.rcParams['axes.labelsize'] = 15  # label size
-    # mpl.rcParams['lines.markersize'] = 10  # weight of the marker
 
+
+def legendParam():
     # Legend
     mpl.rcParams['legend.loc'] = 'best'
     mpl.rcParams['legend.frameon'] = True  # if True, draw the legend on a background patch
@@ -110,10 +146,27 @@ def general():
     # mpl.rcParams['legend.borderaxespad'] = 0.5  # the border between the axes and legend edge
     # mpl.rcParams['legend.columnspacing'] = 8.0  # column separation
 
-# latex
+
+def fontParam():
+    # CONFIGURACIÓN GENERAL
+    # latex modo math
+    # Should be: 'dejavusans' (default), 'dejavuserif', 'cm' (Computer Modern),
+    #             'stix', 'stixsans' or 'custom'
+    mpl.rcParams['mathtext.fontset'] = 'cm'
+    mpl.rcParams['mathtext.fallback'] = 'cm'
+
+    # latex modo text
+    # Should be: serif, sans-serif, cursive, fantasy, monospace
+    mpl.rcParams['font.family'] = 'serif'
+    cmfont = font_manager.FontProperties(fname=mpl.get_data_path()
+                                         + '/fonts/ttf/cmr10.ttf')
+    mpl.rcParams['font.serif'] = cmfont.get_name()
+    mpl.rcParams['font.size'] = 16  # size of the text
+
+    # latex
     mpl.rcParams['text.usetex'] = True
     mpl.rcParams['pgf.rcfonts'] = False
     mpl.rcParams['text.latex.preamble'] = r'\usepackage{amssymb}'  # , \usepackage{txfonts}
     mpl.rcParams['pgf.preamble'] = r'\usepackage{amssymb}'
 
-    return
+
